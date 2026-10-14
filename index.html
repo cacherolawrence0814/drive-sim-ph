@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Drive Sim: Toyota, Honda &amp; Suzuki-style cars</title>
+<style>
+:root{--bg:#bcdcf0;--panel:rgba(255,255,255,.93);--ink:#14181f;--muted:#566070;--acc:#e4002b;--bar:#d6dce4;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e131a;--panel:rgba(22,27,34,.94);--ink:#f1f4f8;--muted:#9aa5b4;--bar:#2b333f}}
+:root[data-theme="dark"]{--bg:#0e131a;--panel:rgba(22,27,34,.94);--ink:#f1f4f8;--muted:#9aa5b4;--bar:#2b333f}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+html,body{height:100%;margin:0;overflow:hidden;background:var(--bg);color:var(--ink);font:14px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
+.box{background:var(--panel);border-radius:10px;padding:6px 12px;font-weight:600}
+#hud{position:fixed;left:0;right:0;top:0;display:flex;justify-content:space-between;gap:8px;padding:calc(env(safe-area-inset-top,0px) + 10px) 12px 0;pointer-events:none}
+#spd{font-size:22px}#hud small{display:block;color:var(--muted);font-weight:400}
+button{font:inherit;font-weight:600;border:0;border-radius:10px;padding:8px 14px;background:var(--acc);color:#fff;cursor:pointer;pointer-events:auto}
+#menu{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:16px;background:rgba(0,0,0,.35);overflow:auto}
+#menu h1{margin:0;font-size:22px;color:#fff;text-align:center}
+#menu p{margin:0;color:#e8edf3;text-align:center;max-width:560px;font-size:12px}
+#cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;max-width:780px;width:100%}
+.card{background:var(--panel);border-radius:14px;padding:12px;cursor:pointer;border:2px solid transparent}
+.card img{width:100%;aspect-ratio:3/2;object-fit:cover;border-radius:10px;display:block;margin-bottom:8px}.card.sel{border-color:var(--acc)}.card small{color:var(--muted)}
+.bar{height:6px;background:var(--bar);border-radius:3px;margin:2px 0 7px}.bar i{display:block;height:100%;background:var(--acc);border-radius:3px}
+#touch{position:fixed;left:0;right:0;bottom:0;display:none;justify-content:space-between;padding:0 14px calc(env(safe-area-inset-bottom,0px) + 14px);pointer-events:none}
+#touch div{display:flex;gap:10px}#touch button{width:76px;height:76px;font-size:22px;opacity:.85;touch-action:none;user-select:none}
+#tdc{position:fixed;inset:0;z-index:5;display:none;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,.6);overflow:auto}#tb{background:var(--panel);color:var(--ink);border-radius:16px;padding:18px;max-width:560px;width:100%;max-height:100%;overflow:auto}#tb h2,#tb h3{margin:4px 0 8px}#tb li{margin:4px 0}
+.opt{display:block;width:100%;text-align:left;margin:6px 0;background:var(--bar);color:var(--ink)}.opt.ok{background:#1e8e3e;color:#fff}.opt.no{background:#c5221f;color:#fff}.gh{background:var(--bar);color:var(--ink)}
+.sgs{display:flex;gap:12px;flex-wrap:wrap;margin:8px 0}.sgs>div{text-align:center;font-size:11px}.sg{width:54px;height:54px;margin:0 auto 4px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:11px;color:#fff;box-sizing:border-box}.stop{background:#c8102e;clip-path:polygon(30% 0,70% 0,100% 30%,100% 70%,70% 100%,30% 100%,0 70%,0 30%)}.yld{background:#c8102e;clip-path:polygon(0 0,100% 0,50% 100%)}.spd{border:6px solid #c8102e;border-radius:50%;background:#fff;color:#000}.wrn{background:#f5c400;color:#000;font-size:20px;clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%)}.man{background:#0a5bd0;border-radius:50%;font-size:22px}
+</style></head><body>
+<canvas id="c"></canvas>
+<div id="hud">
+ <div class="box" style="display:flex;gap:10px;align-items:center"><img id="ci" alt="" onerror="this.style.display='none'" style="width:64px;height:44px;object-fit:cover;border-radius:6px"><div><span id="spd">0 km/h</span><small id="cn"></small></div></div>
+ <div style="display:flex;gap:8px;align-items:flex-start">
+  <div class="box" style="text-align:right">Lap <span id="lap">0</span> &middot; <span id="tm">0.0s</span><small>Last <span id="ll">--</span> &middot; Best <span id="bl">--</span></small><small>Score <span id="sc">100</span> &middot; <span id="tr"></span> &middot; Limit <span id="lm">80</span></small></div>
+  <button id="chg">Cars</button>
+ </div>
+</div>
+<div id="msg" class="box" style="position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 70px);display:none;pointer-events:none;white-space:nowrap"></div>
+<div id="tdc"><div id="tb"></div></div>
+<div id="touch"><div><button data-k="l">&#9664;</button><button data-k="r">&#9654;</button></div><div><button data-k="d">BRAKE</button><button data-k="u">GAS</button></div></div>
+<div id="menu">
+ <h1>Pick your ride</h1>
+ <div id="cards"></div>
+ <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center"><button id="go" style="font-size:16px;padding:10px 28px">Start driving</button><button id="th" style="font-size:16px;padding:10px 20px">Theory course</button></div>
+<label style="color:#fff"><input type="checkbox" id="pm"> Practice mode (no scoring)</label>
+ <p>Controls: arrow keys or WASD, or the on-screen buttons on a phone. The loop has a steep hill, two mud pits, a flooded road and a river ford. Grass and mud slow every car, and low cars (Vios, Civic) struggle in deep water, while the Hilux and Jimny cope better. Two traffic lights on the loop: stop fully at red. Obey the speed limit (80 km/h on the open road, 20 km/h in the school zone), give way to the pedestrian on the crossing and to the vehicle on your right at the intersection after the hill, and pull to the right for the ambulance. There is also a 30 km/h city zone around the first traffic light. Each lap you get a driver score: 85 and up is a Professional driver, 76 to 84 a Non-professional driver, and 75 or below Passenger only.</p>
+ <p>Unofficial fan project. Not affiliated with or endorsed by Toyota, Honda or Suzuki; all names and photos belong to their owners. The 3D cars are simple low-poly stand-ins and the stats are rough approximations.</p>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(()=>{
+const IMGS=["assets/vios.jpg","assets/hilux.jpg","assets/civic.jpg","assets/jimny.jpg"];
+const CARS=[
+{n:"Toyota Vios",img:IMGS[0],top:170,acc:7.5,turn:1.7,off:.55,col:0xd62a1f,L:4.4,W:1.7,H:.7,cl:.22,cabL:2.1,cabH:.5,cabZ:-.25},
+{n:"Toyota Hilux",img:IMGS[1],top:160,acc:6.5,turn:1.5,off:.85,col:0x4a4f58,L:5.2,W:1.85,H:.85,cl:.4,cabL:1.8,cabH:.6,cabZ:.9},
+{n:"Honda Civic Type R",img:IMGS[2],top:200,acc:9,turn:2,off:.5,col:0xf2f4f7,L:4.4,W:1.8,H:.6,cl:.15,cabL:2,cabH:.45,cabZ:-.2},
+{n:"Suzuki Jimny",img:IMGS[3],top:135,acc:6,turn:2.1,off:.9,col:0x9c9c94,L:3.6,W:1.6,H:.9,cl:.4,cabL:2.4,cabH:.7,cabZ:-.2}];
+const R=80,RW=16,TAU=Math.PI*2,$=id=>document.getElementById(id);
+const renderer=new THREE.WebGLRenderer({canvas:$("c"),antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x9fd0ee);scene.fog=new THREE.Fog(0x9fd0ee,60,260);
+const cam=new THREE.PerspectiveCamera(60,1,.1,600);
+scene.add(new THREE.HemisphereLight(0xffffff,0x4f6b45,.95));
+const sun=new THREE.DirectionalLight(0xffffff,.8);sun.position.set(50,100,30);scene.add(sun);
+function mk(geo,col,x,y,z){const m=new THREE.Mesh(geo,new THREE.MeshLambertMaterial({color:col}));m.position.set(x||0,y||0,z||0);scene.add(m);return m}
+const IA=2.76,IX=(R-RW/2-14)*Math.cos(IA),IZ=(R-RW/2-14)*Math.sin(IA);
+function H(x,z){const r=Math.hypot(x,z),d=Math.abs(r-R),t=(Math.atan2(z,x)+TAU)%TAU,cl=(v,a,b)=>Math.min(1,Math.max(0,(v-a)/(b-a)));
+ const e=t>.6&&t<2.7?12*Math.pow(Math.sin(Math.PI*(t-.6)/2.1),2):0,far=cl(d,RW/2+3,RW/2+28),rd=1-cl(d,RW/2+1,RW/2+7),rm=cl(14-Math.abs(z),0,5)*(1-cl(x,-55,-40));
+ return e*(1-far)+far*4*Math.sin(x*.04)*Math.cos(z*.035)*cl(Math.hypot(x-IX,z-IZ),16,36)-3.2*rm*(1-rd)}
+function lift(g,o){const p=g.attributes.position;for(let i=0;i<p.count;i++)p.setZ(i,H(p.getX(i),-p.getY(i))+o);g.computeVertexNormals();return g}
+function seg(a,l,o,col,op){const m=mk(lift(new THREE.RingGeometry(R-RW/2,R+RW/2,24,1,-(a+l),l),o),col);m.rotation.x=-Math.PI/2;if(op){m.material.transparent=true;m.material.opacity=op}return m}
+mk(lift(new THREE.PlaneGeometry(640,640,160,160),-.25),0x4f8a45).rotation.x=-Math.PI/2;
+mk(lift(new THREE.RingGeometry(R-RW/2,R+RW/2,192),.02),0x3a3f47).rotation.x=-Math.PI/2;
+[R-RW/2-.7,R+RW/2].forEach(r=>{mk(lift(new THREE.RingGeometry(r,r+.7,192),.03),0xe8e8e8).rotation.x=-Math.PI/2});
+seg(3.6,.5,.05,0x5b3a1e);seg(5.4,.4,.05,0x5b3a1e);seg(4.4,.4,.3,0x2e6fa8,.7);
+mk(new THREE.PlaneGeometry(255,28),0x2e6fa8,-172.5,.22,0).rotation.x=-Math.PI/2;scene.children[scene.children.length-1].material.transparent=true;scene.children[scene.children.length-1].material.opacity=.7;
+const dg=new THREE.BoxGeometry(.3,.02,3);
+for(let i=0;i<48;i++){const a=i/48*TAU;mk(dg,0xf2c200,R*Math.cos(a),H(R*Math.cos(a),R*Math.sin(a))+.1,R*Math.sin(a)).rotation.y=-a}
+mk(new THREE.BoxGeometry(RW,.03,1.2),0xffffff,R,H(R,0)+.07,0);
+const tg=new THREE.CylinderGeometry(.3,.4,2,6),lg=new THREE.ConeGeometry(2,5,7);
+for(let i=0;i<110;i++){const a=Math.random()*TAU,o=Math.random()<.7,r=o?R+RW/2+6+Math.random()*60:Math.random()*(R-RW/2-8);
+ const x=Math.cos(a)*r,z=Math.sin(a)*r;if(x<-20&&Math.abs(z)<26)continue;const y=H(x,z);mk(tg,0x6b4a2b,x,y+1,z);mk(lg,0x2f6b34,x,y+4.5,z)}
+function buildCar(c){
+ const g=new THREE.Group(),L=(geo,col,x,y,z,em)=>{const m=new THREE.Mesh(geo,em?new THREE.MeshBasicMaterial({color:col}):new THREE.MeshLambertMaterial({color:col}));m.position.set(x,y,z);g.add(m);return m};
+ L(new THREE.BoxGeometry(c.W,c.H,c.L),c.col,0,c.cl+c.H/2,0);
+ L(new THREE.BoxGeometry(c.W*.88,c.cabH,c.cabL),0x222a33,0,c.cl+c.H+c.cabH/2,c.cabZ);
+ const wg=new THREE.CylinderGeometry(.34,.34,.25,14);
+ [[1,1],[-1,1],[1,-1],[-1,-1]].forEach(s=>{L(wg,0x111111,s[0]*c.W/2,.34,s[1]*c.L*.32).rotation.z=Math.PI/2});
+ [-1,1].forEach(s=>{L(new THREE.BoxGeometry(.3,.15,.05),0xfff2b0,s*c.W*.33,c.cl+c.H*.6,c.L/2,1);L(new THREE.BoxGeometry(.3,.15,.05),0xff2a2a,s*c.W*.33,c.cl+c.H*.6,-c.L/2,1)});
+ return g}
+const key=n=>"drivesim-best-"+n;
+const load=n=>{try{const v=localStorage.getItem(key(n));return v?+v:null}catch(e){return null}};
+const save=(n,v)=>{try{localStorage.setItem(key(n),v)}catch(e){}};
+const fmt=s=>s==null?"--":s.toFixed(1)+"s";
+let car,mesh,S,best,last=null,running=false,sel=0;
+function pick(i){car=CARS[i];if(mesh)scene.remove(mesh);mesh=buildCar(car);scene.add(mesh);
+ S={x:R,y:H(R,0),z:0,h:0,v:0,steer:0,th:0,prog:0,lap:0,t:0,lt:0,sc:100,log:[],ft:0,fm:'',stops:0,ot:0,zs:0,pg:0,rg:0,lim:80,an:35,amb:0,aa:0,pd:-1};best=load(car.n);last=null;$("cn").textContent=car.n+(lic()?" \u00b7 Theory passed":"");$("ci").src=car.img;
+ mesh.rotation.order='YXZ';mesh.position.set(R,S.y,0);cam.position.set(R,S.y+4.2,-9)}
+const bar=(l,v)=>`<small>${l}</small><div class="bar"><i style="width:${Math.round(Math.min(1,v)*100)}%"></i></div>`;
+function drawMenu(){$("cards").innerHTML=CARS.map((c,i)=>`<div class="card${i==sel?" sel":""}" data-i="${i}"><img src="${c.img}" alt="${c.n}" onerror="this.style.display='none'"><b>${c.n}</b>${bar("Top speed ~"+c.top+" km/h",c.top/200)}${bar("Acceleration",c.acc/9)}${bar("Handling",c.turn/2.1)}${bar("Off-road grip",c.off)}</div>`).join("")}
+$("cards").onclick=e=>{const d=e.target.closest(".card");if(d){sel=+d.dataset.i;drawMenu()}};
+$("go").onclick=()=>{pick(sel);S.pr=$('pm').checked;$("menu").style.display="none";running=true};
+$("chg").onclick=()=>{running=false;$("menu").style.display="flex"};
+if(matchMedia("(pointer:coarse)").matches)$("touch").style.display="flex";
+const inp={l:0,r:0,u:0,d:0},km={ArrowLeft:"l",KeyA:"l",ArrowRight:"r",KeyD:"r",ArrowUp:"u",KeyW:"u",ArrowDown:"d",KeyS:"d"};
+addEventListener("keydown",e=>{const k=km[e.code];if(k){inp[k]=1;e.preventDefault()}});
+addEventListener("keyup",e=>{const k=km[e.code];if(k)inp[k]=0});
+document.querySelectorAll("[data-k]").forEach(b=>{const k=b.dataset.k;b.addEventListener("pointerdown",e=>{inp[k]=1;e.preventDefault()});
+ ["pointerup","pointercancel","pointerleave"].forEach(ev=>b.addEventListener(ev,()=>{inp[k]=0}))});
+const sg=(c,t,l)=>`<div><div class="sg ${c}">${t}</div>${l}</div>`;
+const LES0=[['Road signs',`<div class="sgs">${sg('stop','STOP','Stop fully')}${sg('yld','','Give way')}${sg('spd','60','Speed limit')}${sg('wrn','!','Warning')}${sg('man','&rarr;','Must do')}</div><p>Red usually means stop, give way or a prohibition. Yellow warns of a hazard ahead. Blue means a required action. Shapes and symbols vary a little by country, so check your local handbook.</p>`],
+['Rules of the road','<ul><li>Obey traffic lights, signs, road markings and traffic enforcers.</li><li>Give way to pedestrians on crossings and to emergency vehicles with sirens.</li><li>Seat belts for everyone. No handheld phone and never drink and drive.</li><li>At junctions, if you are unsure who goes first, slow down and give way.</li></ul>'],
+['Speed and distance','<ul><li>Match your speed to the road, weather and traffic, not just the limit.</li><li>Keep at least 3 seconds behind the car ahead. Add more in rain, mud or at night.</li><li>Double the speed and your braking distance becomes about four times longer.</li></ul>'],
+['Hills, mud, floods and rivers','<ul><li>Hills: use a lower gear going down so the engine helps you slow. Do not ride the brakes or coast in neutral.</li><li>Mud: slow down early, steer and brake gently, no sudden moves.</li><li>Floods: never drive into water if you cannot tell how deep it is. Floodwater hides holes and moving water can sweep a car away. Turn around.</li><li>River fords: only if it is shallow and you know the bed. Go slowly in a low gear and do not stop in the middle.</li><li>After water, test your brakes gently.</li></ul>']];
+const Q0=[['What should you do at a STOP sign?',['Slow down and go if clear','Come to a full stop, then go when safe','Honk and proceed','Stop only if cars are coming'],1,'A stop sign always means a complete stop.'],
+['A red-bordered circle with a number is a...',['Speed limit sign','Distance marker','Parking sign','Exit number'],0,'It is a speed limit: do not go above it.'],
+['A yellow warning sign means...',['Road closed','Hazard ahead: slow down and be ready','You have right of way','Parking allowed'],1,'Warning signs tell you to expect a hazard.'],
+['A flooded road, and you cannot tell how deep it is. You should...',['Drive fast through it','Follow the car ahead','Turn around or find another route','Drive through in first gear'],2,'Floodwater hides holes and debris, and moving water can sweep a car away.'],
+['A safe following distance in good weather is about...',['1 second','3 seconds','10 seconds','One car length'],1,'Use the 3-second rule, and more in bad conditions.'],
+['If you double your speed, braking distance becomes about...',['The same','Twice as long','Four times as long','Half as long'],2,'Braking distance grows with the square of speed.'],
+['Going down a long steep hill you should...',['Coast in neutral','Ride the brakes all the way','Use a lower gear so the engine helps','Turn off the engine'],2,'Engine braking stops the brakes from overheating.'],
+['On a muddy road you should...',['Brake hard and steer sharply','Slow early, steer and brake gently','Accelerate to power through','Switch off the lights'],1,'Sudden moves break grip in mud.'],
+['After driving through deep water you should...',['Test your brakes gently','Park immediately','Speed up to dry them','Do nothing'],0,'Wet brakes can be weak, so test them.'],
+['A pedestrian is on a crossing. You must...',['Honk','Give way','Speed up','Flash your lights'],1,'Pedestrians on a crossing have priority.'],
+['Using a handheld phone while driving...',['Is fine if it is short','Is unsafe and illegal in many places','Is safe with one hand','Helps in traffic'],1,'It takes your eyes, hands and mind off the road.'],
+['A red traffic light means...',['Slow down','Stop and wait behind the line','Go if nobody is coming','Honk'],1,'Red means stop and wait.'],
+['An ambulance with a siren comes up behind you. You should...',['Speed up','Stay where you are','Safely pull over and let it pass','Block the lane'],2,'Make way for emergency vehicles safely.'],
+['Who must wear a seat belt?',['Driver only','Front passengers only','Everyone in the vehicle','Only on highways'],2,'Everyone, on every trip.'],
+['Before crossing a shallow river ford you should...',['Check the depth and bed, then cross slowly in low gear','Rev hard','Cross as fast as you can','Stop in the middle'],0,'Slow and steady, and never stop midstream.']];
+const PHL=[['LTO Theoretical Driving Course','<ul><li>The LTO requires a 15-hour Theoretical Driving Course (TDC) for student permit applicants. It is given in three 5-hour sessions by LTO-accredited centers or driving schools, some of them online.</li><li>Topics include road signs, signals and markings, turning, parking, right of way, overtaking and expressway rules, plus the Land Transportation and Traffic Code (RA 4136) and related laws.</li><li>After the TDC come an 8-hour Practical Driving Course, then the LTO theoretical exam and practical driving test.</li><li>Student permit: at least 16 years old, with parental consent if under 18.</li><li>LTO has talked about shortening these hours, so check the current rules at an LTO office or lto.gov.ph. This game is practice only. It does not replace the official course or give an official certificate.</li></ul>'],
+['Speed limits (RA 4136)','<ul><li>Open country roads with no blind corners: cars and motorcycles 80 km/h, trucks and buses 50 km/h.</li><li>Through streets or boulevards clear of traffic: 40 km/h (trucks and buses 30).</li><li>City and municipal streets with light traffic: 30 km/h.</li><li>Crowded streets, blind-corner intersections, school zones and when passing stationary vehicles: 20 km/h.</li><li>Expressways are commonly signed at 100 km/h. Local roads may post lower limits.</li></ul>'],
+['Right of way and overtaking','<ul><li>At an intersection with no signal, if two vehicles arrive at the same time, the vehicle on the right goes first.</li><li>Vehicles already inside an intersection or a rotunda (roundabout) have the right of way over those entering.</li><li>A vehicle entering the highway from a private road or driveway must give way to highway traffic.</li><li>Always give way to pedestrians on a crossing, and to ambulances, fire trucks and police vehicles sounding sirens (pull to the right and stop if needed).</li><li>Overtake on the left, when the road ahead is clear, and signal first. The driver being overtaken must give way and must not speed up.</li><li>Do not overtake at intersections, on curves or on hills where you cannot see ahead.</li></ul>'],
+['Lights, parking and key laws','<ul><li>Green: go if the intersection is clear. Yellow: get ready to stop, and do not enter if you can stop safely. Red: stop before the line.</li><li>No parking inside an intersection, near a fire hydrant, at hospital or fire station entrances, or double parked.</li><li>Parking on a slope with a curb: facing downhill, turn the wheels toward the curb. Facing uphill, turn them away from it. Always set the parking brake.</li><li>RA 10913 Anti-Distracted Driving Act: no handheld phone use while driving.</li><li>RA 10586 Anti-Drunk and Drugged Driving Act: never drive under the influence.</li><li>RA 8750 Seat Belts Use Act: wear your seat belt.</li></ul>']];
+const PHQ=[['How many hours is the LTO Theoretical Driving Course (TDC)?',['8','15','20','30'],1,'The TDC is 15 hours, given in three 5-hour sessions.'],
+['The TDC is required for applicants of the...',['Student permit','Vehicle registration','Plate number','Franchise'],0,'You need the TDC certificate to get a student permit.'],
+['Which law is the Land Transportation and Traffic Code?',['RA 4136','RA 10913','RA 8750','RA 10586'],0,'RA 4136 is the base traffic law. RA 10913 is the Anti-Distracted Driving Act.'],
+['Maximum speed for a car on an open country road with no blind corners:',['60 km/h','80 km/h','100 km/h','120 km/h'],1,'RA 4136 sets 80 km/h for cars and motorcycles there.'],
+['Maximum speed when passing a school zone:',['20 km/h','30 km/h','40 km/h','60 km/h'],0,'Crowded streets, blind corners and school zones are 20 km/h.'],
+['Maximum speed on a city street with light traffic that is not a through street:',['20 km/h','30 km/h','50 km/h','80 km/h'],1,'It is 30 km/h.'],
+['Two vehicles reach an unsignaled intersection at the same time. Who goes first?',['The faster one','The bigger one','The vehicle on the right','The vehicle on the left'],2,'The vehicle on the right has priority.'],
+['At a rotunda (roundabout), who has the right of way?',['Vehicles entering','Vehicles already in the rotunda','Motorcycles','The biggest vehicle'],1,'Vehicles already inside have priority.'],
+['An ambulance with a siren is behind you. You should...',['Speed up','Stop in the middle of the road','Pull to the right and let it pass','Ignore it'],2,'Emergency vehicles on official business have the right of way.'],
+['A pedestrian is on a marked crosswalk. You must...',['Honk','Give way','Overtake','Speed up'],1,'Give way to pedestrians on a crossing.'],
+['You should overtake another vehicle on the...',['Left','Right','Shoulder','Any side'],0,'Overtake on the left when it is clear, and signal first.'],
+['A driver being overtaken must...',['Speed up','Give way and not speed up','Brake suddenly','Switch lanes'],1,'Do not race the overtaking vehicle.'],
+['A vehicle coming out of a private driveway onto the highway must...',['Go first','Give way to highway traffic','Honk and go','Flash its lights'],1,'Traffic on the highway has priority.'],
+['A yellow traffic light means...',['Speed up','Get ready to stop','Go','Park'],1,'Do not enter the intersection on yellow if you can stop safely.'],
+['Which is NOT allowed?',['Parking at a legal spot','Double parking','Stopping at a red light','Signaling a turn'],1,'Double parking is prohibited.'],
+['Using a handheld phone while driving is covered by...',['RA 10913 (Anti-Distracted Driving Act)','RA 8750','RA 10930','RA 4136 only'],0,'RA 10913 prohibits handheld phone use while driving.'],
+['The Practical Driving Course for a student permit holder is about...',['2 hours','8 hours','30 hours','There is none'],1,'The practical course is 8 hours.'],
+['The usual speed limit on Philippine expressways is...',['60 km/h','80 km/h','100 km/h','150 km/h'],2,'It is commonly 100 km/h, but follow the posted signs.']];
+const Q=[...PHQ,Q0[3],Q0[6],Q0[7],Q0[8],Q0[14]];
+const lic=()=>{try{return localStorage.getItem('drivesim-licensed')==='1'}catch(e){return false}};
+const tb=$('tb');let li=0,qs=[],qi=0,sc=0;
+const LES=[...PHL,...LES0];
+const thL=()=>{$('th').textContent=lic()?'Theory course (passed)':'Theory course'};
+const closeT=()=>{$('tdc').style.display='none';thL()};
+function lesson(){const l=LES[li],last=li==LES.length-1;tb.innerHTML=`<h2>${l[0]} (${li+1}/${LES.length})</h2>${l[1]}<button id="nx">${last?'Start the test':'Next'}</button> <button class="gh" id="cl">Close</button>`;$('nx').onclick=()=>{if(last){qs=[...Q].sort(()=>Math.random()-.5).slice(0,10);qi=0;sc=0;ques()}else{li++;lesson()}};$('cl').onclick=closeT}
+function ques(){const q=qs[qi];tb.innerHTML=`<small>Question ${qi+1}/10</small><h3>${q[0]}</h3>`+q[1].map((o,i)=>`<button class="opt" data-i="${i}">${o}</button>`).join('')+'<div id="fb"></div>';
+ tb.querySelectorAll('.opt').forEach(b=>b.onclick=()=>{const i=+b.dataset.i;tb.querySelectorAll('.opt').forEach(x=>{x.disabled=true;if(+x.dataset.i==q[2])x.classList.add('ok')});if(i==q[2])sc++;else b.classList.add('no');$('fb').innerHTML=`<p><b>${i==q[2]?'Correct.':'Not quite.'}</b> ${q[3]}</p><button id="nq">${qi<9?'Next question':'See result'}</button>`;$('nq').onclick=()=>{qi++;qi<10?ques():done()}})}
+function done(){const ok=sc>=7;if(ok){try{localStorage.setItem('drivesim-licensed','1')}catch(e){}}
+ tb.innerHTML=`<h2>${ok?'You passed!':'Not yet'}</h2><p>Score: ${sc}/10 (pass mark 7).</p><p>${ok?'You earned the Theory passed badge. It shows in the game next to your car name. This is a practice badge, not an official LTO certificate.':'Review the lessons and try again.'}</p><button id="rt">${ok?'Retake test':'Review lessons'}</button> <button class="gh" id="cl">Back to menu</button>`;$('cl').onclick=closeT;$('rt').onclick=()=>{li=0;lesson()};thL()}
+$('th').onclick=()=>{li=0;lesson();$('tdc').style.display='flex'};thL();
+const WARN=[[.42,.6,'Steep hill ahead: slow down, keep your distance'],[0,.4,'School zone: 20 km/h. Watch for pedestrians'],[6.08,6.29,'School zone ahead: slow to 20 km/h'],[2.45,2.75,'Intersection ahead: give way to traffic from the right'],[2.8,3,'River crossing ahead: check the depth first'],[3.3,3.6,'Slippery road ahead: ease off, steer gently'],[4.1,4.4,'Flooded road ahead: never drive into deep water'],[5.1,5.4,'Slippery road ahead: ease off, steer gently'],[4.65,5,'Traffic light ahead: stop if it is red'],[5.8,6.05,'Traffic light ahead: stop if it is red']];
+function W(t){const w=WARN.find(a=>t>a[0]&&t<a[1]);return w?'\u26a0 '+w[2]:''}
+const LIGHTS=[{a:5,o:0},{a:6.05,o:5}],CLR=[0xff2a2a,0xffc400,0x25d44a];
+LIGHTS.forEach(L=>{const k=R-RW/2-1.6,x=k*Math.cos(L.a),z=k*Math.sin(L.a),y=H(x,z);
+ mk(new THREE.CylinderGeometry(.12,.12,4.4,8),0x333333,x,y+2.2,z);mk(new THREE.BoxGeometry(.4,1.6,.4),0x111111,x,y+4.5,z);
+ L.m=CLR.map((c,i)=>{const m=mk(new THREE.SphereGeometry(.26,10,8),c,x,y+5.05-i*.5,z);m.material=new THREE.MeshBasicMaterial({color:c});return m.material});
+ mk(new THREE.BoxGeometry(RW,.03,.6),0xffffff,R*Math.cos(L.a),H(R*Math.cos(L.a),R*Math.sin(L.a))+.07,R*Math.sin(L.a)).rotation.y=-L.a});
+const PED=new THREE.Group(),PA=.3;
+{const b=new THREE.Mesh(new THREE.BoxGeometry(.4,1.1,.3),new THREE.MeshLambertMaterial({color:0xff7a00})),h=new THREE.Mesh(new THREE.SphereGeometry(.17,10,8),new THREE.MeshLambertMaterial({color:0xf1c27d}));b.position.y=.65;h.position.y=1.4;PED.add(b,h);scene.add(PED)}
+for(let i=0;i<8;i++){const rr=R-RW/2+1+i*2,x=rr*Math.cos(PA),z=rr*Math.sin(PA);mk(new THREE.BoxGeometry(.8,.03,3),0xffffff,x,H(x,z)+.07,z).rotation.y=-PA}
+const pedP=()=>{const ph=(S.t%28)/28;return ph<.1?-1:ph<.4?-1+2*(ph-.1)/.3:ph<.5?1:ph<.8?1-2*(ph-.5)/.3:-1};
+mk(new THREE.BoxGeometry(8,.03,28),0x3a3f47,IX,.06,IZ).rotation.y=Math.PI/2-IA;
+const AI=buildCar({...CARS[2],col:0xb5651d});AI.rotation.y=Math.PI/2-IA;scene.add(AI);
+const aiQ=()=>(S.t%22)*8-28,aiConf=()=>{const q=aiQ();return q>-14&&q<18};
+const AMB=buildCar({...CARS[0],col:0xffffff,L:5,W:2,H:1.3,cl:.3,cabL:2.5,cabH:.6,cabZ:-.4}),SR=new THREE.Mesh(new THREE.BoxGeometry(1.2,.22,.4),new THREE.MeshBasicMaterial({color:0xff2a2a}));
+SR.position.set(0,2.4,-.4);AMB.add(SR);AMB.visible=false;scene.add(AMB);
+const wA=x=>((x+Math.PI)%TAU+TAU)%TAU-Math.PI;
+function amb(dt){if(!S.amb){AMB.visible=false;if(S.t>S.an){S.amb=1;S.aa=S.th-.5;S.pd=-1;flash('Ambulance behind you! Pull to the right and slow down')}return}
+ S.aa+=Math.max(Math.abs(S.v)+8,25)/R*dt;const df=wA(S.aa-S.th),r=Math.hypot(S.x,S.z),ax=(R+2)*Math.cos(S.aa),az=(R+2)*Math.sin(S.aa);
+ AMB.visible=true;AMB.position.set(ax,H(ax,az),az);AMB.rotation.y=-S.aa;SR.material.color.setHex(Math.floor(S.t*6)%2?0xff2a2a:0x2a5aff);
+ if(S.pd<0&&df>=0){if(r<R-3.2&&Math.abs(S.v)<8){S.stops++;flash('You made way for the ambulance. Well done!')}else pen(15,'Did not make way for the ambulance')}
+ S.pd=df;if(df>.9){S.amb=0;S.an=S.t+45}}
+const ls=(L,t)=>{const p=(t+L.o)%14;return p<6?2:p<8?1:0};
+function lights(){LIGHTS.forEach(L=>{const s=ls(L,S.t);L.m.forEach((m,i)=>m.color.setHex(i==s?CLR[i]:0x222222))});const p=pedP(),r=R+p*(RW/2+1.5),x=r*Math.cos(PA),z=r*Math.sin(PA);PED.position.set(x,H(x,z),z);const aq=aiQ(),ar=R-RW/2+aq,ax=ar*Math.cos(IA),az=ar*Math.sin(IA);AI.visible=aq<24;AI.position.set(ax,H(ax,az),az)}
+function flash(m){S.fm=m;S.ft=3}
+function pen(n,w){if(S.pr){flash(w+' (practice: no penalty)');return}S.sc-=n;S.log.push('-'+n+' '+w);flash(w+' (-'+n+')')}
+function chk(t0,t1,d){LIGHTS.forEach(L=>{const s=ls(L,S.t),da=L.a-t1;
+ if(s==0&&da>0&&da<.3&&Math.abs(S.v)<.6&&!L.st){L.st=1;S.stops++;flash('Stopped at the red light. Well done!')}
+ if(d>0&&t0<L.a&&t1>=L.a){if(s==0)pen(20,'Ran a red light');L.st=0}});
+ const on=Math.abs(pedP())<.84,dp=PA-t1;
+ if(on&&dp>0&&dp<.25&&Math.abs(S.v)<.6&&!S.pg){S.pg=1;S.stops++;flash('Gave way to the pedestrian. Well done!')}
+ if(d>0&&t0<PA&&t1>=PA){if(on)pen(15,'Did not give way to a pedestrian');S.pg=0}
+ const ia=IA-t1;
+ if(aiConf()&&ia>0&&ia<.25&&Math.abs(S.v)<.6&&!S.rg){S.rg=1;S.stops++;flash('Gave way to the vehicle on the right. Well done!')}
+ if(d>0&&t0<IA&&t1>=IA){if(aiConf())pen(15,'Did not give way to the vehicle on the right');S.rg=0}}
+function tier(s){return s>=85?['Professional driver','Great driving. You follow the rules and handle the hazards.']:s>75?['Non-professional driver','Decent, but you need more practice with the rules.']:['Passenger only','Not recommended to be a driver. Review the theory course and try again.']}
+function lapEnd(){if(S.pr){flash('Lap '+S.lap+' done: '+fmt(last));return}running=false;for(const k in inp)inp[k]=0;const s=Math.max(0,S.sc),T=tier(s);
+ tb.innerHTML=`<h2>Lap ${S.lap} report</h2><p style='font-size:36px;font-weight:800;margin:4px 0'>${s}/100</p><h3>${T[0]}</h3><p>${T[1]}</p>${S.log.length?'<p>Rules broken: '+S.log.length+'</p><ul>'+S.log.map(x=>'<li>'+x+'</li>').join('')+'</ul>':'<p>No rule violations. Perfect lap!</p>'}<p>Correct stops (lights, pedestrians, give way, ambulance): ${S.stops}</p><button id='nl'>Next lap</button> <button class='gh' id='cm'>Change car</button>`;
+ const rs=()=>{$('tdc').style.display='none';S.sc=100;S.log=[];S.stops=0};
+ $('nl').onclick=()=>{rs();running=true};$('cm').onclick=()=>{rs();$('menu').style.display='flex'};$('tdc').style.display='flex'}
+function step(dt){lights();amb(dt);
+ const c=car,r=Math.hypot(S.x,S.z),on=Math.abs(r-R)<RW/2,vmax=c.top/3.6,t=(S.th+TAU)%TAU;
+ const mud=on&&((t>3.6&&t<4.1)||(t>5.4&&t<5.8)),wd=(on&&t>4.4&&t<4.8)?.3:(S.x<-45&&Math.abs(S.z)<13?.22:0),deep=wd>c.cl*.9;
+ let maxV=vmax*(on?1:c.off);if(mud)maxV*=.35+.5*c.off;if(wd)maxV*=deep?.25:.75;
+ if(!on&&!S.off)pen(3,'Left the road');S.off=!on;if(mud&&!S.pm&&S.v>11)pen(5,'Too fast into mud');S.pm=mud;if(wd&&!S.pw&&S.v>11)pen(5,'Too fast into water');S.pw=!!wd;S.ft-=dt;
+ const lim=(t>.05&&t<.4)?20:(t>4.85&&t<5.95)?30:80,kmh=Math.abs(S.v)*3.6;S.lim=lim;
+ if(kmh>lim+(lim>50?8:5)){S.ot+=dt;if(lim<50){if(S.ot>1.2&&S.zs!=lim){S.zs=lim;pen(10,'Speeding: the limit here is '+lim+' km/h')}}else if(S.ot>8){S.ot=0;pen(5,'Speeding: the limit is 80 km/h')}}else S.ot=0;
+ if(lim==80)S.zs=0;if(lim!=S.pl){if(S.pl!=null)flash('Speed limit now '+lim+' km/h');S.pl=lim}
+ const fx=Math.sin(S.h),fz=Math.cos(S.h),sl=(H(S.x+fx*2,S.z+fz*2)-H(S.x-fx*2,S.z-fz*2))/4;
+ if(inp.u)S.v+=c.acc*dt*(1-Math.max(S.v,0)/(vmax*1.05));
+ if(inp.d)S.v-=(S.v>0?18:c.acc*.5)*dt;
+ if(!inp.u&&!inp.d)S.v-=Math.sign(S.v)*Math.min(Math.abs(S.v),3*dt);
+ S.v-=S.v*((on?.04:.5)+(mud?.5:0)+(wd?(deep?1.2:.35):0)+(wd&&!on?3:0))*dt;S.v-=9.8*sl*1.6*dt;
+ if(S.v>maxV)S.v-=(S.v-maxV)*1.5*dt;
+ S.v=Math.max(-8,S.v);
+ S.steer+=((inp.l-inp.r)-S.steer)*Math.min(1,8*dt);
+ S.h+=S.steer*c.turn*(mud?.6:1)*(1-.5*Math.min(1,Math.abs(S.v)/vmax))*dt*Math.max(-1,Math.min(1,S.v/6));
+ S.x+=Math.sin(S.h)*S.v*dt;S.z+=Math.cos(S.h)*S.v*dt;S.y=H(S.x,S.z);S.t+=dt;
+ const th=Math.atan2(S.z,S.x);let d=th-S.th;if(d>Math.PI)d-=TAU;if(d<-Math.PI)d+=TAU;const t1=(th+TAU)%TAU;S.th=th;S.prog+=d;chk(t,t1,d);
+ if(S.prog>=TAU){S.prog-=TAU;S.lap++;last=S.t-S.lt;S.lt=S.t;if(best==null||last<best){best=last;save(car.n,last)}lapEnd()}
+ if(S.prog<0)S.prog=0;
+ const m=S.ft>0?S.fm:S.amb?'Ambulance behind: pull to the right and slow down':deep?'Deep water! Low cars struggle':wd?'Shallow water: drive steady':mud?'Mud! Low grip':sl>.1?'Steep uphill':W(t),me=$('msg');me.style.display=m?'block':'none';me.textContent=m;
+ mesh.position.set(S.x,S.y,S.z);mesh.rotation.y=S.h;mesh.rotation.x=-Math.atan(sl);mesh.rotation.z=-S.steer*Math.min(1,Math.abs(S.v)/30)*.05}
+function render(dt){
+ const fx=Math.sin(S.h),fz=Math.cos(S.h),k=1-Math.exp(-dt*6);
+ cam.position.lerp(new THREE.Vector3(S.x-fx*9,S.y+4.2,S.z-fz*9),k);
+ cam.fov=60+Math.min(1,Math.abs(S.v)/50)*12;cam.updateProjectionMatrix();
+ cam.position.y=Math.max(cam.position.y,H(cam.position.x,cam.position.z)+1.5);cam.lookAt(S.x+fx*4,S.y+1.2,S.z+fz*4);renderer.render(scene,cam);
+ $("spd").textContent=Math.round(Math.abs(S.v)*3.6)+" km/h";$("lap").textContent=S.lap;
+ $("tm").textContent=fmt(S.t-S.lt);$("ll").textContent=fmt(last);$("bl").textContent=fmt(best);const sv=Math.max(0,S.sc);$("sc").textContent=sv;$("tr").textContent=S.pr?'Practice mode':tier(sv)[0];$("lm").textContent=S.lim||80}
+function rs(){renderer.setSize(innerWidth,innerHeight,false);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix()}
+addEventListener("resize",rs);rs();pick(0);drawMenu();
+let prev=performance.now();
+(function loop(now){const dt=Math.min(.05,(now-prev)/1000);prev=now;if(running)step(dt);render(dt);requestAnimationFrame(loop)})(prev);
+})();
+</script></body></html>
