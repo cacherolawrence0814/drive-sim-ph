@@ -33,4 +33,4 @@ The lessons use public information about the LTO Theoretical Driving Course and 
 - Built with [three.js](https://threejs.org/) (MIT).
 
 ## License
-MIT for the code (see `LICENSE`). Photos and brand names are not covered by this license.
+LAWRENCE CACHERO for the code (see `LICENSE`). Photos and brand names are not covered by this license.
